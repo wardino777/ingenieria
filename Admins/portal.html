@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maipú Solidario - Portal Vecino</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap');
+        :root { --maipu-blue: #0055A4; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #fafaf9; margin: 0; padding: 0; }
+        .maipu-blue { background-color: var(--maipu-blue); }
+        .nav-item.active { background-color: #eff6ff; color: #1d4ed8; border-right: 4px solid #1d4ed8; }
+
+        .radio-box:checked + label {
+            border-color: var(--maipu-blue) !important;
+            background-color: #eff6ff !important;
+            box-shadow: 0 0 0 2px var(--maipu-blue);
+            transform: scale(1.02);
+        }
+
+        .section-step { position: relative; padding-left: 2.5rem; }
+        .section-step::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: #e7e5e4; }
+        .section-step:last-child::before { display: none; }
+
+        #qrcode-view { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; background: white; border-radius: 3rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1); cursor: pointer; transition: all 0.3s ease; border: 2px solid transparent; position: relative; overflow: hidden; }
+        #qrcode-view:hover { border-color: var(--maipu-blue); transform: translateY(-5px); }
+        #qrcode-container img { border: 12px solid white; border-radius: 1.5rem; }
+
+        .scan-line { width: 100%; height: 3px; background: rgba(239, 68, 68, 0.5); position: absolute; top: 0; left: 0; animation: scan 2s infinite linear; z-index: 20; box-shadow: 0 0 8px red; }
+        @keyframes scan { 0% { top: 0%; } 100% { top: 100%; } }
+
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        video {
+            transform: rotateY(0deg);
+            -webkit-transform: rotateY(0deg);
+            -moz-transform: rotateY(0deg);
+        }
+    </style>
+</head>
+<body>
+    <div id="auth-screen" class="fixed inset-0 z-[100] bg-stone-100 flex items-center justify-center p-4">
+        <div class="max-w-md w-full bg-white p-10 rounded-[3.5rem] shadow-2xl border border-stone-200 fade-in text-center">
+            <div class="w-20 h-20 maipu-blue rounded-3xl flex items-center justify-center text-white text-4xl font-black mx-auto mb-6 shadow-xl">M</div>
+            <h2 class="text-3xl font-black text-stone-900 tracking-tighter">Maipú Solidario</h2>
+            <div class="space-y-4 text-left mt-8">
+                <input type="email" id="auth-email" placeholder="tu-correo@gmail.com" class="w-full p-4 bg-stone-50 border rounded-2xl font-bold outline-none">
+                <button onclick="autenticar()" class="w-full maipu-blue text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg hover:opacity-90">Ingresar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="main-app" class="hidden h-screen w-full flex overflow-hidden">
+        <aside class="w-64 bg-white border-r border-stone-200 flex flex-col shrink-0 hidden md:flex">
+            <div class="p-6 border-b border-stone-100 text-center">
+                <h1 class="font-black text-lg text-stone-800 tracking-tighter uppercase">MAIPÚ <span class="text-blue-600">SOLI</span></h1>
+                <div class="mt-4 p-3 bg-blue-600 rounded-2xl text-white shadow-xl"><p class="text-[8px] font-black uppercase tracking-widest opacity-80">Usuario</p><p id="user-logged-display" class="text-[10px] font-bold truncate">Invitado</p></div>
+            </div>
+            <nav class="flex-1 py-4">
+                <ul class="space-y-1">
+                    <li><button onclick="showSection('nueva')" id="nav-nueva" class="nav-item active w-full text-left px-6 py-3 text-xs font-bold flex items-center gap-3"><i class="fa-solid fa-box text-blue-500"></i> Donar Insumos</button></li>
+                    <li><button onclick="showSection('ticket')" id="nav-ticket" class="nav-item w-full text-left px-6 py-3 text-xs font-bold flex items-center gap-3"><i class="fa-solid fa-ticket text-blue-500"></i> Mi Ticket / PDF</button></li>
+                    <li><button onclick="showSection('historial')" id="nav-historial" class="nav-item w-full text-left px-6 py-3 text-xs font-bold flex items-center gap-3"><i class="fa-solid fa-clock-rotate-left text-blue-500"></i> Mi Trazabilidad</button></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Navegación Móvil Inferior -->
+        <nav class="md:hidden fixed bottom-0 w-full bg-white border-t border-stone-200 flex justify-around p-3 z-50">
+            <button onclick="showSection('nueva')" class="flex flex-col items-center text-blue-600 font-bold text-[10px]"><i class="fa-solid fa-box text-lg mb-1"></i>Donar</button>
+            <button onclick="showSection('ticket')" class="flex flex-col items-center text-stone-400 font-bold text-[10px]"><i class="fa-solid fa-ticket text-lg mb-1"></i>Ticket</button>
+            <button onclick="showSection('historial')" class="flex flex-col items-center text-stone-400 font-bold text-[10px]"><i class="fa-solid fa-clock-rotate-left text-lg mb-1"></i>Historial</button>
+        </nav>
+
+        <main class="flex-1 overflow-y-auto bg-stone-50/50 p-6 md:p-8 pb-24 md:pb-8">
+            <div class="max-w-xl mx-auto">
+                
+                <!-- SECCIÓN: NUEVA DONACIÓN -->
+                <section id="sec-nueva" class="app-section fade-in">
+                    <h2 class="text-3xl md:text-4xl font-black text-stone-900 tracking-tighter mb-8">Nueva Donación</h2>
+                    <form class="space-y-10" onsubmit="registrarDonacion(event)">
+                        
+                        <div class="section-step">
+                            <div class="flex items-center gap-3 mb-4 -ml-10"><span class="w-8 h-8 rounded-full maipu-blue text-white flex items-center justify-center font-black text-xs">1</span><h3 class="text-lg font-black text-stone-800">Ubicación del Tótem</h3></div>
+                            <select id="f-totem" required class="w-full p-4 bg-white border rounded-xl font-bold text-sm outline-none"><option value="" disabled selected>Cargando tótems...</option></select>
+                        </div>
+
+                        <div class="section-step">
+                            <div class="flex items-center gap-3 mb-4 -ml-10"><span class="w-8 h-8 rounded-full maipu-blue text-white flex items-center justify-center font-black text-xs">2</span><h3 class="text-lg font-black text-stone-800">Categoría</h3></div>
+                            <select id="f-cat" required class="w-full p-4 bg-white border rounded-xl font-bold text-sm outline-none mb-3" onchange="updateSubcat(this.value)">
+                                <option value="" disabled selected>Seleccione...</option>
+                                <option value="Alimentos">🥫 Alimentos No Perecibles</option>
+                                <option value="Agua">💧 Agua y Bebidas</option>
+                                <option value="Ropa Invierno">🧥 Ropa de Invierno</option>
+                                <option value="Ropa Verano">👕 Ropa de Verano</option>
+                                <option value="Calzado">👟 Calzado</option>
+                                <option value="Ropa Cama">🛏️ Ropa de Cama / Mantas</option>
+                                <option value="Higiene">🧼 Higiene Personal</option>
+                                <option value="Aseo Hogar">🧹 Productos de Aseo Hogar</option>
+                                <option value="Insumos Medicos">🩹 Insumos Médicos Básicos</option>
+                                <option value="Medicamentos">💊 Medicamentos Sellados</option>
+                                <option value="Herramientas">🧰 Herramientas de Rescate</option>
+                                <option value="Construccion">🧱 Materiales Construcción</option>
+                                <option value="Electronica">🔦 Electrónica / Linternas</option>
+                                <option value="Baterias">🔋 Baterías y Pilas</option>
+                                <option value="Escolares">✏️ Útiles Escolares</option>
+                                <option value="Libros">📚 Libros y Revistas</option>
+                                <option value="Juguetes">🧸 Juguetes</option>
+                                <option value="Articulos Bebe">🍼 Artículos para Bebés</option>
+                                <option value="Mascotas">🐶 Alimento Mascotas</option>
+                                <option value="Otros">📦 Otros / Misceláneo</option>
+                            </select>
+                            <input type="text" id="f-subcat" required placeholder="Ej: Tallarines" class="w-full p-4 bg-white border rounded-xl font-bold text-sm outline-none">
+                        </div>
+
+                        <div class="section-step">
+                            <div class="flex items-center gap-3 mb-4 -ml-10"><span class="w-8 h-8 rounded-full maipu-blue text-white flex items-center justify-center font-black text-xs">3</span><h3 class="text-lg font-black text-stone-800">Estado de Conservación</h3></div>
+                            <div class="grid grid-cols-3 gap-2">
+                                <input type="radio" name="estado" id="st-n" value="Nuevo" class="radio-box hidden" checked>
+                                <label for="st-n" class="flex flex-col items-center p-4 bg-white border border-stone-100 rounded-2xl cursor-pointer hover:bg-stone-50 transition-all text-center">
+                                    <span class="text-2xl mb-1">✨</span><span class="text-[8px] font-black uppercase">Nuevo</span>
+                                </label>
+                                <input type="radio" name="estado" id="st-e" value="Excelente" class="radio-box hidden">
+                                <label for="st-e" class="flex flex-col items-center p-4 bg-white border border-stone-100 rounded-2xl cursor-pointer hover:bg-stone-50 transition-all text-center">
+                                    <span class="text-2xl mb-1">👍</span><span class="text-[8px] font-black uppercase">Excelente</span>
+                                </label>
+                                <input type="radio" name="estado" id="st-b" value="Bueno" class="radio-box hidden">
+                                <label for="st-b" class="flex flex-col items-center p-4 bg-white border border-stone-100 rounded-2xl cursor-pointer hover:bg-stone-50 transition-all text-center">
+                                    <span class="text-2xl mb-1">👌</span><span class="text-[8px] font-black uppercase">Bueno</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="section-step">
+                            <div class="flex items-center gap-3 mb-4 -ml-10"><span class="w-8 h-8 rounded-full maipu-blue text-white flex items-center justify-center font-black text-xs">4</span><h3 class="text-lg font-black text-stone-800">Ficha Técnica / Lista</h3></div>
+                            <textarea id="f-desc" required rows="3" placeholder="Describa los artículos aquí. Esta lista aparecerá detallada en el PDF que entregará el QR." class="w-full p-4 bg-white border border-stone-200 rounded-xl text-sm font-medium resize-none outline-none focus:ring-4 focus:ring-blue-50"></textarea>
+                        </div>
+
+                        <div class="section-step">
+                            <div class="flex items-center gap-3 mb-4 -ml-10"><span class="w-8 h-8 rounded-full maipu-blue text-white flex items-center justify-center font-black text-xs">5</span><h3 class="text-lg font-black text-stone-800">Caducidad</h3></div>
+                            <div class="bg-white p-4 rounded-xl border border-stone-200 shadow-sm">
+                                <input type="date" id="input-vencimiento" class="w-full p-2 text-sm font-bold outline-none disabled:opacity-30">
+                                <p id="no-aplica-msg" class="hidden text-[8px] font-black text-stone-400 mt-1 uppercase tracking-widest">ℹ️ PRODUCTO NO PERECIBLE</p>
+                            </div>
+                        </div>
+
+                        <div class="section-step">
+                            <div class="flex items-center gap-3 mb-4 -ml-10"><span class="w-8 h-8 rounded-full maipu-blue text-white flex items-center justify-center font-black text-xs">6</span><h3 class="text-lg font-black text-stone-800">Higiene</h3></div>
+                            <label class="flex items-center gap-3 p-5 bg-white border border-stone-200 rounded-2xl cursor-pointer hover:bg-stone-50 shadow-sm transition-all">
+                                <input type="checkbox" required class="w-6 h-6 accent-blue-600 rounded">
+                                <span class="text-xs font-bold text-stone-700">Certifico lavado y desinfección del insumo</span>
+                            </label>
+                        </div>
+
+                        <div class="section-step">
+                            <div class="flex items-center gap-3 mb-4 -ml-10"><span class="w-8 h-8 rounded-full maipu-blue text-white flex items-center justify-center font-black text-xs">7</span><h3 class="text-lg font-black text-stone-800">Tipo de Empaque</h3></div>
+                            <div class="grid grid-cols-3 gap-2">
+                                <input type="radio" name="empaque" id="pk-b" value="Bolsa" class="radio-box hidden" checked>
+                                <label for="pk-b" class="flex flex-col items-center p-4 bg-white border border-stone-100 rounded-2xl cursor-pointer hover:bg-stone-50 text-center transition-all">
+                                    <span class="text-2xl mb-1">🛍️</span><span class="text-[8px] font-black uppercase">Bolsa</span>
+                                </label>
+                                <input type="radio" name="empaque" id="pk-c" value="Caja" class="radio-box hidden">
+                                <label for="pk-c" class="flex flex-col items-center p-4 bg-white border border-stone-100 rounded-2xl cursor-pointer hover:bg-stone-50 text-center transition-all">
+                                    <span class="text-2xl mb-1">📦</span><span class="text-[8px] font-black uppercase">Caja</span>
+                                </label>
+                                <input type="radio" name="empaque" id="pk-s" value="Sin" class="radio-box hidden">
+                                <label for="pk-s" class="flex flex-col items-center p-4 bg-white border border-stone-100 rounded-2xl cursor-pointer hover:bg-stone-50 text-center transition-all">
+                                    <span class="text-2xl mb-1">🧤</span><span class="text-[8px] font-black uppercase">Sin</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- 8. Módulo de Cámara en Vivo -->
+                        <div class="section-step">
+                            <div class="flex items-center gap-3 mb-4 -ml-10"><span class="w-8 h-8 rounded-full maipu-blue text-white flex items-center justify-center font-black text-xs">8</span><h3 class="text-lg font-black text-stone-800">Validación Visual (Foto)</h3></div>
+                            <p class="text-xs text-stone-500 font-medium mb-4">La central de Maipú revisará la imagen para validar el estado del producto.</p>
+                            
+                            <button type="button" onclick="iniciarCamara()" id="btn-iniciar-camara" class="w-full bg-white border-2 border-dashed border-stone-300 rounded-3xl p-8 text-center cursor-pointer hover:bg-stone-50 transition-all flex flex-col items-center justify-center">
+                                <div class="text-4xl mb-2 text-stone-300"><i class="fa-solid fa-camera"></i></div>
+                                <p class="font-black uppercase tracking-widest text-[10px] text-stone-500">Activar Cámara</p>
+                            </button>
+
+                            <div id="contenedor-video" class="hidden flex-col items-center gap-4 w-full bg-stone-900 p-4 rounded-3xl">
+                                <video id="video-vivo" class="w-full max-h-64 object-cover rounded-2xl bg-black" autoplay playsinline></video>
+                                <div class="flex gap-2 w-full">
+                                    <button type="button" onclick="detenerCamara()" class="bg-stone-700 text-white p-4 rounded-2xl font-bold"><i class="fa-solid fa-xmark"></i></button>
+                                    <button type="button" onclick="tomarFoto()" class="flex-1 bg-emerald-500 text-white p-4 rounded-2xl font-black uppercase text-xs tracking-widest"><i class="fa-solid fa-camera mr-2"></i> Capturar</button>
+                                </div>
+                            </div>
+
+                            <div id="contenedor-resultado" class="hidden flex-col items-center gap-4 w-full">
+                                <div class="relative w-full">
+                                    <img id="foto-preview" class="w-full max-h-64 object-cover rounded-3xl border-4 border-green-500 shadow-lg" src="">
+                                    <div class="absolute bottom-4 left-0 w-full text-center">
+                                        <span class="bg-green-500 text-white text-[10px] px-3 py-1 font-black uppercase rounded-full shadow">✓ Capturada</span>
+                                    </div>
+                                </div>
+                                <button type="button" onclick="retomarFoto()" class="text-stone-400 font-bold text-xs underline uppercase tracking-widest hover:text-stone-600">Retomar Fotografía</button>
+                            </div>
+
+                            <canvas id="canvas-foto" class="hidden"></canvas>
+                        </div>
+
+                        <button type="submit" id="btn-enviar-revision" class="w-full bg-stone-200 text-stone-400 font-black py-6 rounded-2xl shadow-sm transition-all text-xs tracking-widest uppercase cursor-not-allowed" disabled>
+                            ENVIAR A REVISIÓN
+                        </button>
+                    </form>
+                </section>
+
+                <!-- SECCIÓN: TICKET (PDF DESDE QR) -->
+                <section id="sec-ticket" class="app-section hidden fade-in">
+                    <!-- Vista de revisión / Bloqueado -->
+                    <div id="ticket-pending-view" class="max-w-md mx-auto text-center py-10 hidden">
+                         <div class="w-24 h-24 bg-amber-100 rounded-full flex items-center justify-center text-amber-500 text-4xl mx-auto mb-6"><i class="fa-solid fa-clock"></i></div>
+                         <h2 class="text-2xl font-black text-stone-900 mb-2">En Revisión</h2>
+                         <p class="text-stone-500 text-sm mb-6">Tu donación está siendo verificada por la Central Maipú. El código QR se habilitará cuando sea aprobada.</p>
+                         <button onclick="checkActiveTicket()" class="text-xs font-bold text-blue-600 uppercase tracking-widest border border-blue-200 bg-blue-50 px-6 py-3 rounded-xl hover:bg-blue-100">Actualizar Estado</button>
+                    </div>
+
+                    <!-- Vista de rechazo -->
+                    <div id="ticket-rejected-view" class="max-w-md mx-auto text-center py-10 hidden">
+                         <div class="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center text-red-500 text-4xl mx-auto mb-6"><i class="fa-solid fa-ban"></i></div>
+                         <h2 class="text-2xl font-black text-red-600 mb-2">Insumo Rechazado</h2>
+                         <p class="text-stone-500 text-sm mb-4">Lo sentimos, la Central ha rechazado esta donación basándose en la fotografía enviada.</p>
+                         <div class="bg-red-50 border border-red-100 p-4 rounded-xl text-left mb-6">
+                             <span class="text-[9px] font-black text-red-400 uppercase tracking-widest">Motivo:</span>
+                             <p id="ticket-rejected-motivo" class="text-red-700 font-bold text-sm mt-1">---</p>
+                         </div>
+                         <button onclick="limpiarTicket()" class="w-full bg-stone-200 text-stone-500 font-black py-4 rounded-2xl text-[10px] uppercase tracking-widest hover:bg-stone-300 transition-all">Generar Nueva Donación</button>
+                    </div>
+
+                    <!-- Vista de éxito (QR) -->
+                    <div id="ticket-active-view" class="max-w-md mx-auto text-center hidden">
+                        <div class="inline-flex items-center gap-2 bg-emerald-100 text-emerald-700 px-4 py-2 rounded-full font-black text-[10px] uppercase tracking-widest mb-6">
+                            <i class="fa-solid fa-check-circle"></i> Aprobado por Central
+                        </div>
+                        <h2 class="text-3xl font-black text-stone-900 mb-2 tracking-tighter">Ticket Activo</h2>
+                        <p class="text-stone-500 text-sm mb-10">Muestre este QR al Tótem o <b>tóquelo</b> para abrir su PDF oficial.</p>
+
+                        <div id="qrcode-view" onclick="verPdfDesdeQr()">
+                            <div class="scan-line"></div>
+                            <div id="qrcode-container" class="flex justify-center"></div>
+                            <div class="mt-8 space-y-2">
+                                <p id="ticket-totem-name" class="font-black text-blue-700 text-lg uppercase"></p>
+                                <div class="bg-blue-50 px-6 py-3 rounded-2xl border border-blue-100 inline-block">
+                                    <span id="ticket-verify-id" class="font-mono text-xl font-bold text-blue-800">---</span>
+                                </div>
+                                <p class="text-[9px] text-stone-400 font-bold uppercase mt-4">👇 TOCAR QR PARA VER PDF DE LISTA</p>
+                            </div>
+                        </div>
+
+                        <button onclick="simularUso()" class="mt-10 w-full bg-stone-900 text-white font-black py-4 rounded-2xl text-[10px] uppercase tracking-[0.2em] hover:bg-black transition-all">
+                            Simular Uso (Abre PDF Auto)
+                        </button>
+                    </div>
+
+                    <div id="ticket-empty-view" class="max-w-md mx-auto text-center py-20 opacity-30 uppercase font-black tracking-widest">No hay ticket activo</div>
+                </section>
+
+                <!-- SECCIÓN: HISTORIAL PERSONAL Y GRÁFICO -->
+                <section id="sec-historial" class="app-section hidden fade-in">
+                    <h2 class="text-3xl md:text-4xl font-black text-stone-800 mb-8 uppercase tracking-widest text-center">Mi Trazabilidad</h2>
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        <div class="lg:col-span-8 bg-white rounded-2xl shadow-lg border border-stone-100 overflow-hidden">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-stone-50 font-black uppercase text-stone-400"><tr><th class="px-4 py-4">Detalle del Insumo</th><th class="px-4 py-4 text-right">Validación</th></tr></thead>
+                                <tbody id="tabla-body" class="divide-y divide-stone-100"></tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Panel de Impacto (Gráfico) -->
+                        <div class="lg:col-span-4 bg-white p-6 rounded-2xl shadow-lg border border-stone-100 flex flex-col items-center h-fit">
+                            <h4 class="font-black text-stone-800 mb-6 uppercase text-[10px] tracking-widest">Mi Impacto</h4>
+                            <div class="w-full h-[200px]"><canvas id="impactChart"></canvas></div>
+                            <div class="mt-4 text-center">
+                                <p id="total-donaciones" class="text-2xl font-black text-blue-600">0</p>
+                                <p class="text-[8px] font-black uppercase text-stone-400">Donaciones Totales</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- BOTÓN FLOTANTE DE EMERGENCIA (SOS) -->
+    <button onclick="solicitarAyuda()" class="fixed bottom-20 md:bottom-8 right-6 w-14 h-14 bg-red-600 text-white rounded-full shadow-2xl flex items-center justify-center text-xl hover:bg-red-700 transition-transform hover:scale-110 z-[200]">
+        <i class="fa-solid fa-bell"></i>
+    </button>
+
+    <div id="toast" class="fixed bottom-24 md:bottom-6 right-1/2 translate-x-1/2 md:translate-x-0 md:right-6 bg-slate-900 text-white px-8 py-4 rounded-xl transform translate-y-32 opacity-0 transition-all duration-500 z-[1000] font-black text-[10px] uppercase tracking-widest text-center w-max"></div>
+
+    <script>
+        const API_BASE_URL = "http://127.0.0.1:5000";
+        const { jsPDF } = window.jspdf;
+        let currentUserEmail = "";
+        
+        // Configuración de EmailJS
+        const SERVICE_ID = "service_yr1q4uh";
+        const TEMPLATE_ID = "template_5zhq4ab";
+        const PUBLIC_KEY = "Tv42t60oJadXM6ICW";
+        (function(){ emailjs.init(PUBLIC_KEY); })();
+
+        // Mapeo global de iconos para las 20 categorias
+        const icons = {
+            'Alimentos': '🥫', 'Agua': '💧', 'Ropa Invierno': '🧥', 'Ropa Verano': '👕', 
+            'Calzado': '👟', 'Ropa Cama': '🛏️', 'Higiene': '🧼', 'Aseo Hogar': '🧹', 
+            'Insumos Medicos': '🩹', 'Medicamentos': '💊', 'Herramientas': '🧰', 
+            'Construccion': '🧱', 'Electronica': '🔦', 'Baterias': '🔋', 'Escolares': '✏️', 
+            'Libros': '📚', 'Juguetes': '🧸', 'Articulos Bebe': '🍼', 'Mascotas': '🐶', 'Otros': '📦'
+        };
+
+        // Variables de estado de cámara y gráficos
+        let videoStream = null;
+        let base64Image = null;
+        const videoEl = document.getElementById('video-vivo');
+        const canvasEl = document.getElementById('canvas-foto');
+        const previewEl = document.getElementById('foto-preview');
+        let myChart;
+
+        async function fetchAPI(e, opt={}) { try{ const res = await fetch(`${API_BASE_URL}${e}`, {headers:{'Content-Type':'application/json'}, ...opt}); return await res.json();} catch(err){return null;} }
+
+        async function autenticar() {
+            const email = document.getElementById('auth-email').value.trim();
+            if(!email) return flash("⚠️ Ingrese correo");
+            currentUserEmail = email;
+            
+            // Para el vecino simulamos un login directo sin contraseña para agilizar, pero registrándolo en MySQL
+            await fetchAPI('/api/users/login', { method: 'POST', body: JSON.stringify({ name: email, password: 'vecino', rank: 'Vecino Solidario' }) });
+            
+            // Enviar email de acceso (si hay cupo en EmailJS)
+            const code = "MAI-" + Math.floor(1000 + Math.random() * 9000);
+            emailjs.send(SERVICE_ID, TEMPLATE_ID, { user_email: email, recovery_code: code })
+                   .then(() => flash("✅ Código enviado.")).catch(() => flash("⚠️ Error EmailJS (o límite alcanzado)."));
+
+            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('main-app').classList.remove('hidden');
+            document.getElementById('user-logged-display').innerText = email;
+            
+            const totems = await fetchAPI('/api/totems');
+            if(totems) document.getElementById('f-totem').innerHTML = '<option value="" disabled selected>Seleccione punto de entrega...</option>' + totems.map(t => `<option value="${t.id}">📍 ${t.nombre}</option>`).join('');
+            
+            actualizarVisuales();
+        }
+
+        function showSection(id) {
+            document.querySelectorAll('.app-section').forEach(s => s.classList.add('hidden'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            
+            document.getElementById('sec-' + id).classList.remove('hidden');
+            document.getElementById('nav-' + id)?.classList.add('active');
+            
+            if(id === 'historial') actualizarVisuales();
+            if(id === 'ticket') checkActiveTicket();
+        }
+
+        function updateSubcat(cat) {
+            const s = document.getElementById('f-subcat');
+            s.placeholder = 'Escriba el detalle del insumo...';
+            
+            const perecibles = ['Alimentos', 'Agua', 'Higiene', 'Aseo Hogar', 'Insumos Medicos', 'Medicamentos', 'Articulos Bebe', 'Mascotas'];
+            const inputVenc = document.getElementById('input-vencimiento');
+            const msgNoAplica = document.getElementById('no-aplica-msg');
+            
+            if (perecibles.includes(cat)) {
+                inputVenc.disabled = false; inputVenc.required = true;
+                msgNoAplica.classList.add('hidden');
+            } else {
+                inputVenc.disabled = true; inputVenc.required = false;
+                msgNoAplica.classList.remove('hidden');
+                inputVenc.value = '';
+            }
+        }
+
+        // --- FUNCIONES DE CÁMARA EN VIVO --- //
+        async function iniciarCamara() {
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } 
+                });
+                videoEl.srcObject = videoStream;
+                document.getElementById('btn-iniciar-camara').classList.add('hidden');
+                document.getElementById('contenedor-video').classList.remove('hidden');
+                document.getElementById('contenedor-resultado').classList.add('hidden');
+            } catch (err) {
+                flash('❌ Permiso de cámara denegado o no disponible.');
+            }
+        }
+
+        function tomarFoto() {
+            if (!videoStream) return;
+            canvasEl.width = videoEl.videoWidth;
+            canvasEl.height = videoEl.videoHeight;
+            const ctx = canvasEl.getContext('2d');
+            ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+            
+            base64Image = canvasEl.toDataURL('image/jpeg', 0.7);
+            detenerCamara();
+            
+            previewEl.src = base64Image;
+            document.getElementById('contenedor-resultado').classList.remove('hidden');
+            document.getElementById('contenedor-resultado').classList.add('flex');
+            
+            const btnEnviar = document.getElementById('btn-enviar-revision');
+            btnEnviar.disabled = false;
+            btnEnviar.className = "w-full maipu-blue text-white font-black py-6 rounded-2xl shadow-xl hover:opacity-90 transition-all text-xs tracking-widest uppercase";
+            flash('📸 Fotografía capturada');
+        }
+
+        function detenerCamara() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+            }
+            document.getElementById('contenedor-video').classList.add('hidden');
+            if (!base64Image) document.getElementById('btn-iniciar-camara').classList.remove('hidden');
+        }
+
+        function retomarFoto() {
+            base64Image = null;
+            const btnEnviar = document.getElementById('btn-enviar-revision');
+            btnEnviar.disabled = true;
+            btnEnviar.className = "w-full bg-stone-200 text-stone-400 font-black py-6 rounded-2xl shadow-sm transition-all text-xs tracking-widest uppercase cursor-not-allowed";
+            iniciarCamara();
+        }
+
+        // --- COMUNICACIÓN CON MYSQL E INGRESO DE DATOS --- //
+        async function registrarDonacion(event) {
+            event.preventDefault();
+            if(!base64Image) return flash('⚠️ Debes tomar una fotografía primero');
+
+            const verifyID = "MAI-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+            const totemId = document.getElementById('f-totem').value;
+            const cat = document.getElementById('f-cat').value;
+            const sub = document.getElementById('f-subcat').value;
+            const desc = document.getElementById('f-desc').value;
+            const estado = document.querySelector('input[name="estado"]:checked').value;
+            const empaque = document.querySelector('input[name="empaque"]:checked').value;
+            const venc = document.getElementById('input-vencimiento').value || 'No aplica';
+
+            const payload = {
+                codigo_ticket: verifyID,
+                totem_id: totemId,
+                categoria: cat,
+                subcategoria: sub,
+                descripcion: desc,
+                estado_conservacion: estado,
+                tipo_empaque: empaque,
+                fecha_vencimiento: venc,
+                user: currentUserEmail,
+                imagen_base64: base64Image
+            };
+
+            const btnEnviar = document.getElementById('btn-enviar-revision');
+            btnEnviar.innerText = "ENVIANDO...";
+
+            const res = await fetchAPI('/api/donations/create', { method: 'POST', body: JSON.stringify(payload) });
+            
+            if (res && res.status === 'success') {
+                const selectTotem = document.getElementById('f-totem');
+                
+                // CORRECCIÓN: Limpiar caracteres y espacios antes de guardar en el Ticket local
+                const totemTextRaw = selectTotem.options[selectTotem.selectedIndex].text;
+                const totemText = totemTextRaw.replace('📍 ', '').trim();
+
+                const localTicket = {
+                    id: verifyID,
+                    user: currentUserEmail,
+                    fecha: new Date().toLocaleString(),
+                    totem: totemText, // Guardamos sin el emoji
+                    cat: cat,
+                    sub: sub,
+                    desc: desc,
+                    estado: estado,
+                    empaque: empaque,
+                    venc: venc,
+                    status: 'activo'
+                };
+
+                localStorage.setItem('maipu_active_ticket', JSON.stringify(localTicket));
+                flash('✅ Registro Exitoso. Enviando a Central para su revisión...');
+                
+                // Limpiar formulario y resetear cámara
+                document.getElementById('f-subcat').value = '';
+                document.getElementById('f-desc').value = '';
+                base64Image = null;
+                document.getElementById('contenedor-resultado').classList.add('hidden');
+                document.getElementById('contenedor-resultado').classList.remove('flex');
+                document.getElementById('btn-iniciar-camara').classList.remove('hidden');
+                
+                btnEnviar.disabled = true;
+                btnEnviar.innerText = "ENVIAR A REVISIÓN";
+                btnEnviar.className = "w-full bg-stone-200 text-stone-400 font-black py-6 rounded-2xl shadow-sm transition-all text-xs tracking-widest uppercase cursor-not-allowed";
+                
+                // Mover a la pestaña del código QR
+                setTimeout(() => showSection('ticket'), 1000);
+            } else {
+                flash('❌ Error al enviar a la base de datos');
+                btnEnviar.innerText = "ENVIAR A REVISIÓN";
+            }
+        }
+
+        // --- MANEJO DEL TICKET QR Y PDF --- //
+        async function checkActiveTicket() {
+            const ticket = JSON.parse(localStorage.getItem('maipu_active_ticket'));
+            
+            const views = ['ticket-empty-view', 'ticket-pending-view', 'ticket-rejected-view', 'ticket-active-view'];
+            const hideAll = () => views.forEach(v => document.getElementById(v).classList.add('hidden'));
+            
+            if(!ticket || ticket.status === 'usado' || ticket.user !== currentUserEmail) {
+                hideAll();
+                document.getElementById('ticket-empty-view').classList.remove('hidden');
+                return;
+            }
+
+            // Consultar a la base de datos el estado real de validación
+            const res = await fetchAPI(`/api/donations/ticket/${ticket.id}`);
+            
+            hideAll();
+            
+            if(res && res.status === 'success') {
+                if(res.val_status === 'Pendiente') {
+                    document.getElementById('ticket-pending-view').classList.remove('hidden');
+                } else if (res.val_status === 'Rechazado') {
+                    document.getElementById('ticket-rejected-view').classList.remove('hidden');
+                    document.getElementById('ticket-rejected-motivo').innerText = res.motivo || 'No especificado';
+                } else if (res.val_status === 'Aceptado') {
+                    document.getElementById('ticket-active-view').classList.remove('hidden');
+                    
+                    document.getElementById('ticket-totem-name').innerText = ticket.totem;
+                    document.getElementById('ticket-verify-id').innerText = ticket.id;
+
+                    const container = document.getElementById('qrcode-container');
+                    container.innerHTML = "";
+                    new QRCode(container, {
+                        text: "MAIPU_DONACION_ID:" + ticket.id + "|USER:" + currentUserEmail,
+                        width: 200,
+                        height: 200,
+                        colorDark: "#0055A4"
+                    });
+                }
+            } else {
+                 // Fallback si no hay conexión, asumir pendiente
+                 document.getElementById('ticket-pending-view').classList.remove('hidden');
+            }
+        }
+
+        function limpiarTicket() {
+             localStorage.removeItem('maipu_active_ticket');
+             showSection('nueva');
+             flash("🔄 Listo para nueva donación");
+        }
+
+        function generarPDF() {
+            const t = JSON.parse(localStorage.getItem('maipu_active_ticket'));
+            if(!t) return null;
+
+            const doc = new jsPDF();
+            doc.setFillColor(0, 85, 164);
+            doc.rect(0, 0, 210, 45, 'F');
+            doc.setTextColor(255);
+            doc.setFontSize(22);
+            doc.setFont(undefined, 'bold');
+            doc.text("MAIPÚ SOLIDARIO", 20, 25);
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            doc.text("Comprobante de Declaración de Insumos - Municipalidad de Maipú", 20, 35);
+
+            doc.setTextColor(0);
+            doc.setFontSize(16);
+            doc.setFont(undefined, 'bold');
+            doc.text(`TICKET FOLIO: ${t.id}`, 20, 60);
+
+            doc.setFontSize(11);
+            doc.setFont(undefined, 'normal');
+            doc.text(`Usuario: ${t.user}`, 20, 70);
+            doc.text(`Fecha Entrega: ${t.fecha}`, 20, 77);
+            doc.text(`Punto de Entrega (Tótem): ${t.totem}`, 20, 84);
+            doc.line(20, 90, 190, 90);
+
+            doc.setFont(undefined, 'bold');
+            doc.text("ESPECIFICACIONES DEL INSUMO:", 20, 100);
+            doc.setFont(undefined, 'normal');
+            doc.text(`Categoría: ${t.cat} - ${t.sub}`, 20, 110);
+            doc.text(`Estado Declarado: ${t.estado}`, 20, 117);
+            doc.text(`Caducidad/Vencimiento: ${t.venc}`, 20, 124);
+            doc.text(`Tipo de Empaque: ${t.empaque}`, 20, 131);
+
+            doc.setFont(undefined, 'bold');
+            doc.text("LISTA DETALLADA DE ARTÍCULOS:", 20, 155);
+            doc.setFont(undefined, 'normal');
+            const splitText = doc.splitTextToSize(t.desc, 170);
+            doc.text(splitText, 20, 165);
+
+            doc.setFillColor(245, 245, 245);
+            doc.rect(20, 250, 170, 30, 'F');
+            doc.setFontSize(8);
+            doc.text("Escanee este código en el lector del Tótem para autorizar la apertura.", 30, 262);
+            doc.text("Documento vinculado al correo: " + t.user, 30, 268);
+            doc.text("ESTADO: APROBADO POR CENTRAL MAIPÚ", 30, 274);
+
+            return doc;
+        }
+
+        function verPdfDesdeQr() {
+            const doc = generarPDF();
+            if(doc) {
+                const t = JSON.parse(localStorage.getItem('maipu_active_ticket'));
+                flash("📄 Abriendo Comprobante vinculado al QR...");
+                doc.save(`Ticket_Maipu_${t.id}.pdf`);
+                try {
+                    window.open(doc.output('bloburl'), '_blank');
+                } catch(e) {
+                    console.log("Bloqueador de ventanas emergentes activado");
+                }
+            }
+        }
+
+        function simularUso() {
+            const ticket = JSON.parse(localStorage.getItem('maipu_active_ticket'));
+            ticket.status = 'usado';
+            localStorage.setItem('maipu_active_ticket', JSON.stringify(ticket));
+            flash("✅ Tótem Abierto de forma remota. Deposite los insumos.");
+            verPdfDesdeQr();
+            setTimeout(() => showSection('historial'), 1500);
+        }
+
+        // --- SISTEMA DE EMERGENCIA --- //
+        async function solicitarAyuda() {
+            if(!currentUserEmail) return flash("Debes iniciar sesión primero.");
+            
+            if(confirm("🚨 ¿Estás seguro que deseas enviar una alerta crítica de ayuda a la Central? Serás geolocalizado en el tótem más cercano.")) {
+                
+                // Simular que el vecino está en el primer tótem disponible o genérico
+                const selectTotem = document.getElementById('f-totem');
+                const ubicacion = selectTotem.options.length > 1 ? selectTotem.options[1].text : "Punto de Acceso Solidario";
+                
+                const res = await fetchAPI('/api/alerts/create', { 
+                    method: 'POST', 
+                    body: JSON.stringify({ 
+                        prioridad: 'CRÍTICO', 
+                        mensaje: `Vecino solicita asistencia urgente vía App Solidaria.`, 
+                        ubicacion: ubicacion,
+                        user: currentUserEmail
+                    }) 
+                });
+
+                if(res && res.status === 'success') {
+                    flash("🚨 ALERTA ENVIADA A LA CENTRAL. MANTÉN LA CALMA.");
+                } else {
+                    flash("❌ Error de conexión al enviar alerta.");
+                }
+            }
+        }
+
+        // --- ACTUALIZACIÓN DE GRÁFICOS Y TABLAS --- //
+        async function actualizarVisuales() {
+            const list = await fetchAPI(`/api/donations/history/${currentUserEmail}`);
+            if(!list) return;
+
+            document.getElementById('tabla-body').innerHTML = list.map(d => {
+                let badgeClass = "bg-amber-100 text-amber-700";
+                if(d.val_status === 'Aceptado') badgeClass = "bg-emerald-100 text-emerald-700";
+                if(d.val_status === 'Rechazado') badgeClass = "bg-red-100 text-red-700";
+                
+                let rechazoTxt = (d.val_status === 'Rechazado' && d.motivo) ? `<p class="text-red-500 text-[10px] mt-2 font-black leading-tight uppercase bg-red-50 p-2 rounded-lg border border-red-100">MOTIVO RECHAZO: ${d.motivo}</p>` : '';
+                
+                return `<tr class="hover:bg-blue-50 transition-colors border-b border-stone-100">
+                    <td class="px-4 py-4">
+                        <span class="text-stone-400 font-bold text-[9px] uppercase tracking-widest block mb-1">FECHA: ${d.fecha} | TÓTEM: ${d.totem}</span>
+                        <span class="font-black text-slate-800 uppercase block text-sm mb-1">${icons[d.cat] || '📦'} ${d.cat}: ${d.sub}</span>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2 text-[10px] bg-stone-50 p-2 rounded-xl border border-stone-100 font-bold text-stone-600">
+                            <div><span class="uppercase text-stone-400 text-[8px] block">Estado</span> ${d.estado}</div>
+                            <div><span class="uppercase text-stone-400 text-[8px] block">Empaque</span> ${d.empaque}</div>
+                            <div><span class="uppercase text-stone-400 text-[8px] block">Caducidad</span> ${d.venc || 'No aplica'}</div>
+                        </div>
+                        ${rechazoTxt}
+                    </td>
+                    <td class="px-4 py-4 text-right align-top w-24">
+                        <span class="px-3 py-1.5 ${badgeClass} rounded-full font-black text-[9px] uppercase tracking-widest whitespace-nowrap inline-block shadow-sm">${d.val_status || 'Pendiente'}</span>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            // Gráfico ChartJS
+            document.getElementById('total-donaciones').innerText = list.length;
+            const stats = list.reduce((a, b) => { a[b.cat] = (a[b.cat] || 0) + 1; return a; }, {});
+            
+            if(myChart) myChart.destroy();
+            const ctx = document.getElementById('impactChart').getContext('2d');
+
+            if(list.length > 0) {
+                myChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(stats),
+                        datasets: [{
+                            data: Object.values(stats),
+                            backgroundColor: ['#0055A4', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#eab308'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        cutout: '75%',
+                        plugins: { legend: { display: false } },
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+        }
+
+        function flash(m) { const t = document.getElementById('toast'); t.innerText = m; t.classList.remove('translate-y-32', 'opacity-0'); setTimeout(() => t.classList.add('translate-y-32', 'opacity-0'), 3500); }
+    </script>
+</body>
+</html>

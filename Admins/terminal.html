@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seguridad Maipú - Terminal de Asistencia Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+
+        :root {
+            --maipu-blue: #3b82f6;
+            --maipu-red: #e62e2d;
+            --maipu-green: #10b981;
+            --dark-bg: #0d121f;
+            --card-bg: #1a2235;
+        }
+
+        body {
+            background-color: var(--dark-bg);
+            font-family: 'Inter', sans-serif;
+            color: white;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+        }
+
+        /* Header Superior */
+        .header-bar {
+            background-color: var(--card-bg);
+            width: 95%;
+            max-width: 1200px;
+            padding: 15px 30px;
+            border-radius: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border: 1px solid #2a344d;
+        }
+
+        .location-selector {
+            background: #0d121f;
+            color: #3b82f6;
+            border: 1px solid #334155;
+            padding: 5px 10px;
+            border-radius: 8px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            outline: none;
+            cursor: pointer;
+        }
+
+        /* Tarjetas Principales */
+        .card-container {
+            display: flex;
+            gap: 20px;
+            perspective: 1000px;
+        }
+
+        .card {
+            width: 300px;
+            height: 360px;
+            border-radius: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+            text-transform: uppercase;
+        }
+
+        .card:active { transform: translateY(10px); box-shadow: none !important; }
+        .card-red { background: var(--maipu-red); box-shadow: 0 12px 0 #b32121; }
+        .card-blue { background: var(--maipu-blue); box-shadow: 0 12px 0 #2563eb; }
+        .card-green { background: var(--maipu-green); box-shadow: 0 12px 0 #059669; }
+
+        .icon-circle {
+            background: rgba(255, 255, 255, 0.15);
+            width: 110px; height: 110px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 20px; box-shadow: inset 0 0 20px rgba(255,255,255,0.2);
+        }
+
+        .card h2 { font-size: 2rem; font-weight: 800; margin-bottom: 10px; letter-spacing: 1px; }
+
+        /* Modales */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.96);
+            display: none;
+            justify-content: center; align-items: center;
+            z-index: 100; backdrop-filter: blur(12px);
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            width: 95%; max-width: 800px;
+            padding: 40px; border-radius: 35px;
+            border: 1px solid #334155;
+            max-height: 90vh; overflow-y: auto;
+        }
+
+        .input-field {
+            background: #0d121f; border: 1px solid #334155; padding: 14px;
+            border-radius: 12px; width: 100%; color: white; outline: none; margin-top: 5px;
+        }
+        .input-field:focus { border-color: var(--maipu-blue); box-shadow: 0 0 10px rgba(59, 130, 246, 0.3); }
+
+        .selection-btn {
+            background: #252d41; border: 2px solid #334155; padding: 22px;
+            border-radius: 24px; display: flex; align-items: center; gap: 20px;
+            width: 100%; transition: all 0.2s;
+        }
+        .selection-btn:hover { border-color: var(--maipu-blue); background: #2d374d; }
+
+        /* Pasos del Formulario */
+        .section-step {
+            position: relative; padding-left: 45px; margin-bottom: 35px;
+            border-left: 2px dashed #334155;
+        }
+        .step-num {
+            position: absolute; left: -16px; top: 0;
+            width: 32px; height: 32px; background: var(--maipu-blue);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-weight: 900; font-size: 0.8rem; border: 4px solid var(--card-bg);
+            color: white;
+        }
+
+        /* Checkboxes y Radios */
+        .item-checkbox {
+            background: #0d121f; border: 1px solid #334155; padding: 12px;
+            border-radius: 12px; display: flex; align-items: center; gap: 10px;
+            cursor: pointer; transition: 0.2s; font-size: 0.8rem;
+        }
+        .item-checkbox:hover { border-color: #555; }
+        .item-checkbox.selected { border-color: var(--maipu-blue); background: rgba(59, 130, 246, 0.15); }
+
+        .radio-group label {
+            background: #0d121f; border: 1px solid #334155; padding: 12px;
+            border-radius: 12px; cursor: pointer; text-align: center; font-size: 0.75rem; font-weight: bold;
+        }
+        .radio-input:checked + label { border-color: var(--maipu-blue); background: rgba(59, 130, 246, 0.2); }
+
+        /* Botón Emergencia Especial */
+        .btn-emergency-huge {
+            background: linear-gradient(to bottom, #ff4d4d, #b30000);
+            padding: 30px; border-radius: 24px; text-align: center;
+            border: 4px solid #fff; box-shadow: 0 0 30px rgba(255, 0, 0, 0.4);
+            cursor: pointer; transition: all 0.2s; margin-bottom: 30px;
+        }
+        .btn-emergency-huge:active { transform: scale(0.95); box-shadow: none; }
+
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        #clock { font-variant-numeric: tabular-nums; }
+        
+        /* Estilos Cámara Terminal */
+        video {
+            transform: rotateY(0deg);
+            -webkit-transform: rotateY(0deg);
+            -moz-transform: rotateY(0deg);
+            border-radius: 1rem;
+            max-height: 250px;
+            width: 100%;
+            background: #000;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Principal -->
+    <div class="header-bar">
+        <div class="flex items-center gap-4">
+            <div class="bg-blue-600 p-2 rounded-lg">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.47 4.34-3.1 8.16-7 9.42V12h-7V6.3l7-3.11v8.8z"/></svg>
+            </div>
+            <div>
+                <h1 class="text-lg font-extrabold leading-none tracking-tighter uppercase italic">SEGURIDAD MAIPÚ</h1>
+                <div class="flex items-center gap-2 mt-1">
+                    <span class="text-slate-500 text-[9px] font-black uppercase tracking-widest">Punto de Atención:</span>
+                    <!-- CORRECCIÓN: Nombres exactos a la BD -->
+                    <select id="totemLocation" class="location-selector" onchange="updateTotemID()">
+                        <option value="P-01" selected>P-01 Plaza Maipú</option>
+                        <option value="B-02">B-02 Santiago Bueras</option>
+                        <option value="M-01">M-01 Mall Arauco</option>
+                        <option value="I-03">I-03 Intermodal</option>
+                        <option value="S-05">S-05 Satélite</option>
+                        <option value="A-06">A-06 El Abrazo</option>
+                        <option value="H-07">H-07 Hospital</option>
+                        <option value="T-08">T-08 Templo Votivo</option>
+                        <option value="P-09">P-09 Tres Poniente</option>
+                        <option value="MT-10">MT-10 Monte Tabor</option>
+                        <option value="LP-11">LP-11 Las Parcelas</option>
+                        <option value="DS-12">DS-12 Del Sol</option>
+                        <option value="R-13">R-13 Rinconada</option>
+                        <option value="V-14">V-14 Los Héroes</option>
+                        <option value="MM-15">MM-15 Mid Mall</option>
+                        <option value="PJ-16">PJ-16 Pehuén</option>
+                        <option value="LI-17">LI-17 Industrias</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="text-right">
+            <div id="clock" class="text-2xl font-black text-white">00:00</div>
+            <div class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">ID Punto: <span id="totemIDDisplay" class="text-blue-500">MP-P-01</span></div>
+        </div>
+    </div>
+
+    <!-- Menú Principal -->
+    <div class="card-container">
+        <div class="card card-red" onclick="openModal('modalSeguridad')">
+            <div class="icon-circle"><svg width="55" height="55" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/></svg></div>
+            <h2 class="tracking-tighter">Seguridad</h2>
+            <p class="text-[9px] opacity-70">Despacho Patrulla</p>
+        </div>
+
+        <div class="card card-blue" onclick="openModal('modalSocialHub')">
+            <div class="icon-circle"><svg width="55" height="55" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M20.42 4.58a5.4 5.4 0 00-7.65 0l-.77.78-.77-.78a5.4 5.4 0 00-7.65 0C1.46 6.7 1.33 10.28 4 13l8 8 8-8c2.67-2.72 2.54-6.3.42-8.42z"/></svg></div>
+            <h2 class="tracking-tighter">Asistencia</h2>
+            <p class="text-[9px] opacity-70">Salud y Donación</p>
+        </div>
+
+        <div class="card card-green" onclick="openModal('modalInfo')">
+            <div class="icon-circle"><svg width="55" height="55" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></div>
+            <h2 class="tracking-tighter">Información</h2>
+            <p class="text-[9px] opacity-70">Servicios Maipú</p>
+        </div>
+    </div>
+
+    <!-- MODAL HUB ASISTENCIA -->
+    <div id="modalSocialHub" class="modal-overlay">
+        <div class="modal-content border-t-4 border-blue-500">
+            <div id="hubSelection" class="fade-in">
+                <div class="flex justify-between items-start mb-8">
+                    <div>
+                        <h3 class="text-3xl font-black text-blue-400 tracking-tighter uppercase italic">Punto de Asistencia</h3>
+                        <p class="text-gray-500 text-[10px] font-bold uppercase tracking-widest mt-1">Gestión Social y Salud Municipal</p>
+                    </div>
+                    <button onclick="closeModal('modalSocialHub')" class="text-gray-500 hover:text-white text-2xl">✕</button>
+                </div>
+
+                <div class="space-y-4">
+                    <button onclick="showSubForm('formSalud')" class="selection-btn">
+                        <div class="p-4 bg-red-500/20 rounded-full text-red-500"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+                        <div class="text-left"><h4 class="font-bold text-xl uppercase tracking-tighter">Ayuda Médica</h4><p class="text-xs text-gray-400">Emergencias y Ambulancias</p></div>
+                    </button>
+                    <button onclick="showSubForm('formApoyo')" class="selection-btn">
+                        <div class="p-4 bg-yellow-500/20 rounded-full text-yellow-500"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 21a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H12z"/></svg></div>
+                        <div class="text-left"><h4 class="font-bold text-xl uppercase tracking-tighter">Solicitar Apoyo</h4><p class="text-xs text-gray-400">Alimentos, Gas y Beneficios</p></div>
+                    </button>
+                    <button onclick="showSubForm('donarMethodSelection')" class="selection-btn">
+                        <div class="p-4 bg-blue-500/20 rounded-full text-blue-500"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></div>
+                        <div class="text-left"><h4 class="font-bold text-xl uppercase tracking-tighter">Realizar Donación</h4><p class="text-xs text-gray-400">Ingreso técnico de insumos</p></div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- FORMULARIO SALUD -->
+            <div id="formSalud" class="hidden fade-in">
+                <button onclick="backToHub()" class="text-blue-400 font-bold mb-6 text-xs uppercase tracking-widest">← Volver</button>
+                <div class="btn-emergency-huge" onclick="triggerGlobalIncident('CRÍTICO', 'RIESGO VITAL - PARO CARDIACO')">
+                    <h3 class="text-4xl font-black text-white tracking-tighter uppercase italic">Emergencia Crítica</h3>
+                    <p class="text-sm font-bold text-white uppercase mt-1">Vida o Muerte - Riesgo Vital</p>
+                </div>
+                <h3 class="text-xl font-bold mb-6 text-slate-300 uppercase tracking-widest">Otras Solicitudes Médicas</h3>
+                <form onsubmit="triggerGlobalIncident('SALUD', 'Ayuda Médica Registrada'); event.preventDefault();">
+                    <div class="mb-4">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">RUT PACIENTE / ACOMPAÑANTE</label>
+                        <input type="text" class="input-field" placeholder="12.345.678-9" required oninput="formatRUT(this)">
+                    </div>
+                    <div class="mb-8">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Categoría de Atención</label>
+                        <select class="input-field" required>
+                            <option value="">Seleccione cuadro clínico...</option>
+                            <option value="Fractura">Accidente / Fractura Grave</option>
+                            <option value="Parto">Labor de Parto</option>
+                            <option value="Convulsion">Convulsiones / Epilepsia</option>
+                            <option value="Mental">Salud Mental / Crisis Pánico</option>
+                            <option value="Inconciencia">Desmayo / Inconciencia</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full py-5 bg-red-600 rounded-2xl font-black text-xl uppercase shadow-xl">Pedir Paramédico</button>
+                </form>
+            </div>
+
+            <!-- FORMULARIO APOYO SOCIAL -->
+            <div id="formApoyo" class="hidden fade-in">
+                <button onclick="backToHub()" class="text-blue-400 font-bold mb-6 text-xs uppercase tracking-widest">← Volver</button>
+                <h3 class="text-2xl font-black text-yellow-500 mb-6 uppercase tracking-tighter">Solicitud de Apoyo Municipal</h3>
+                <form onsubmit="triggerGlobalIncident('APOYO', 'Solicitud DIDECO Registrada'); event.preventDefault();">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-500 uppercase">RUT BENEFICIARIO</label>
+                            <input type="text" class="input-field" placeholder="12.345.678-9" required oninput="formatRUT(this)">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-500 uppercase">Dirección de Entrega</label>
+                            <input type="text" class="input-field" placeholder="Ej: Av. Pajaritos 1234, Maipú" required>
+                        </div>
+                    </div>
+
+                    <label class="text-[10px] font-black text-gray-500 uppercase mb-3 block">Seleccione Ayudas:</label>
+                    <div class="grid grid-cols-2 gap-3 mb-8">
+                        <label class="item-checkbox"><input type="checkbox"> Vale de Gas (15kg)</label>
+                        <label class="item-checkbox"><input type="checkbox"> Canasta Familiar</label>
+                        <label class="item-checkbox"><input type="checkbox"> Medicamentos (Farmacia)</label>
+                        <label class="item-checkbox"><input type="checkbox"> Pañales Adulto/Niño</label>
+                        <label class="item-checkbox"><input type="checkbox"> Kit de Construcción</label>
+                        <label class="item-checkbox"><input type="checkbox"> Bidones de Agua</label>
+                        <label class="item-checkbox"><input type="checkbox"> Frazadas y Abrigo</label>
+                        <label class="item-checkbox"><input type="checkbox"> Vale de Parafina</label>
+                        <label class="item-checkbox"><input type="checkbox"> Asesoría Legal Social</label>
+                        <label class="item-checkbox"><input type="checkbox"> Becas Escolares</label>
+                    </div>
+
+                    <button type="submit" class="w-full py-5 bg-yellow-600 text-black font-black text-xl uppercase shadow-lg">Enviar Requerimiento</button>
+                </form>
+            </div>
+
+            <!-- SECCIÓN DONACIÓN MÉTODOS -->
+            <div id="donarMethodSelection" class="hidden fade-in">
+                <button onclick="backToHub()" class="text-blue-400 font-bold mb-6 text-xs uppercase tracking-widest">← Volver</button>
+                <h3 class="text-2xl font-black mb-8 text-blue-400 uppercase tracking-tighter italic">Ingreso de Donación</h3>
+                <div class="space-y-4">
+                    <button onclick="showSubForm('formScanner')" class="selection-btn">
+                        <div class="text-3xl">🤳</div>
+                        <div class="text-left"><h4 class="font-bold text-lg uppercase tracking-tight">Cargar desde QR / Código</h4><p class="text-xs text-gray-500">Usar declaración previa del vecino</p></div>
+                    </button>
+                    <button onclick="showSubForm('formManual')" class="selection-btn">
+                        <div class="text-3xl">✍️</div>
+                        <div class="text-left"><h4 class="font-bold text-lg uppercase tracking-tight">Ingresar Solamente</h4><p class="text-xs text-gray-500">Declaración técnica obligatoria (Puntos 2 al 8)</p></div>
+                    </button>
+                </div>
+            </div>
+
+            <!-- FORMULARIO MANUAL FUNCIONAL -->
+            <div id="formManual" class="hidden fade-in">
+                <button onclick="showSubForm('donarMethodSelection'); detenerCamara();" class="text-blue-400 font-bold mb-6 text-xs uppercase tracking-widest">← Atrás</button>
+                <h3 class="text-2xl font-black mb-8 text-white uppercase tracking-tighter italic">Declaración Técnica</h3>
+
+                <form onsubmit="registrarDonacionManual(event)">
+                    <!-- Paso 2: Categoría y Subtipo -->
+                    <div class="section-step"><div class="step-num">2</div>
+                        <label class="text-[10px] font-black text-gray-500 uppercase block mb-1">Categorización</label>
+                        <select required id="m-cat" class="input-field" onchange="updateSub()">
+                            <option value="">Seleccione Categoría...</option>
+                            <option value="Ropa">👕 Vestuario / Ropa</option>
+                            <option value="Alimentos">🥫 Alimentos No Perecibles</option>
+                            <option value="Aseo">🧼 Higiene y Aseo</option>
+                            <option value="Otros">🧸 Otros / Misceláneo</option>
+                        </select>
+                        <select required id="m-sub" class="input-field mt-2">
+                            <option value="">Seleccione Sub-tipo específico...</option>
+                        </select>
+                    </div>
+
+                    <!-- Paso 3: Estado -->
+                    <div class="section-step"><div class="step-num">3</div>
+                        <label class="text-[10px] font-black text-gray-500 uppercase block mb-2">Estado de Conservación</label>
+                        <div class="grid grid-cols-3 gap-2 radio-group">
+                            <input type="radio" name="m-est" id="m-n" value="Nuevo" class="radio-input hidden" checked><label for="m-n">NUEVO</label>
+                            <input type="radio" name="m-est" id="m-e" value="Excelente" class="radio-input hidden"><label for="m-e">EXC.</label>
+                            <input type="radio" name="m-est" id="m-b" value="Bueno" class="radio-input hidden"><label for="m-b">BUENO</label>
+                        </div>
+                    </div>
+
+                    <!-- Paso 4: Ficha -->
+                    <div class="section-step"><div class="step-num">4</div>
+                        <label class="text-[10px] font-black text-gray-500 uppercase block mb-1">Ficha Técnica / Descripción</label>
+                        <textarea required id="m-desc" class="input-field h-20 resize-none" placeholder="Tallas, marcas, unidades o lista de artículos..."></textarea>
+                    </div>
+
+                    <!-- Paso 5: Vencimiento -->
+                    <div class="section-step"><div class="step-num">5</div>
+                        <label class="text-[10px] font-black text-gray-500 uppercase block mb-1">Vencimiento (Si aplica)</label>
+                        <input type="date" id="m-venc" class="input-field">
+                    </div>
+
+                    <!-- Paso 6: Sanitización -->
+                    <div class="section-step"><div class="step-num">6</div>
+                        <label class="flex items-center gap-3 p-4 bg-[#0d121f] rounded-xl border border-slate-700 cursor-pointer">
+                            <input type="checkbox" required class="w-6 h-6 accent-blue-500"><span class="text-[10px] font-bold uppercase tracking-widest">Insumo sanitizado y limpio</span>
+                        </label>
+                    </div>
+
+                    <!-- Paso 7: Empaque -->
+                    <div class="section-step"><div class="step-num">7</div>
+                        <label class="text-[10px] font-black text-gray-500 uppercase block mb-2">Empaque</label>
+                        <div class="grid grid-cols-3 gap-2 radio-group">
+                            <input type="radio" name="m-emp" id="m-bol" value="Bolsa" class="radio-input hidden" checked><label for="m-bol">🛍️ BOLSA</label>
+                            <input type="radio" name="m-emp" id="m-caj" value="Caja" class="radio-input hidden"><label for="m-caj">📦 CAJA</label>
+                            <input type="radio" name="m-emp" id="m-sin" value="Sin Empaque" class="radio-input hidden"><label for="m-sin">🧤 SIN EMPAQUE</label>
+                        </div>
+                    </div>
+
+                    <!-- Paso 8: Foto Obligatoria -->
+                    <div class="section-step"><div class="step-num">8</div>
+                        <label class="text-[10px] font-black text-gray-500 uppercase block mb-2">Fotografía del Insumo (Terminal)</label>
+                        
+                        <div id="cam-container-manual" class="flex flex-col items-center gap-4 bg-[#0d121f] p-4 rounded-xl border border-slate-700">
+                            <video id="video-manual" autoplay playsinline class="hidden"></video>
+                            <img id="preview-manual" class="hidden w-full max-h-[250px] object-cover rounded-xl border-2 border-green-500">
+                            
+                            <div class="flex gap-2 w-full">
+                                <button type="button" onclick="iniciarCamara('manual')" id="btn-start-cam-manual" class="w-full bg-blue-600 text-white p-3 rounded-xl font-bold uppercase text-xs">Activar Cámara</button>
+                                <button type="button" onclick="tomarFoto('manual')" id="btn-snap-manual" class="hidden flex-1 bg-green-500 text-white p-3 rounded-xl font-bold uppercase text-xs">Tomar Foto</button>
+                                <button type="button" onclick="detenerCamara('manual')" id="btn-stop-manual" class="hidden bg-red-600 text-white p-3 px-5 rounded-xl font-bold">X</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btn-submit-manual" disabled class="w-full py-5 bg-slate-700 text-slate-400 rounded-2xl font-black text-lg uppercase shadow-xl transition-colors cursor-not-allowed">Captura foto para continuar</button>
+                </form>
+            </div>
+
+            <!-- SCANNER CON CÁMARA Y VALIDACIÓN DE TÓTEM -->
+            <div id="formScanner" class="hidden fade-in text-center">
+                <button onclick="showSubForm('donarMethodSelection'); detenerCamara();" class="text-blue-400 font-bold mb-6 text-xs block text-left">← Volver</button>
+                
+                <div id="scanner-input-group">
+                    <input type="text" id="scanInput" class="input-field text-center text-3xl font-black py-6 border-2 border-blue-500/50 mb-4 uppercase" placeholder="MAI-0000">
+                    <button onclick="buscarTicket()" class="w-full py-4 bg-blue-600 rounded-xl font-bold uppercase">Verificar Datos QR</button>
+                </div>
+
+                <div id="scanResult" class="hidden mt-8 bg-[#0d121f] p-8 rounded-[2rem] border border-slate-700 text-left">
+                    <h4 class="text-blue-400 font-black text-[10px] uppercase mb-4 tracking-widest text-center">Información del Vecino:</h4>
+                    <div id="itemList" class="text-[11px] leading-relaxed italic opacity-80 mb-6 text-slate-300"></div>
+                    
+                    <!-- Fotografía Terminal para ticket QR -->
+                    <div class="mb-6 border-t border-slate-700 pt-6">
+                        <label class="text-[10px] font-black text-gray-500 uppercase block mb-3 text-center">Validación Visual en Punto de Entrega</label>
+                        <div class="flex flex-col items-center gap-4 bg-black p-4 rounded-xl border border-slate-700">
+                            <video id="video-qr" autoplay playsinline class="hidden"></video>
+                            <img id="preview-qr" class="hidden w-full max-h-[250px] object-cover rounded-xl border-2 border-green-500">
+                            
+                            <div class="flex gap-2 w-full">
+                                <button type="button" onclick="iniciarCamara('qr')" id="btn-start-cam-qr" class="w-full bg-blue-600 text-white p-3 rounded-xl font-bold uppercase text-xs">Activar Cámara</button>
+                                <button type="button" onclick="tomarFoto('qr')" id="btn-snap-qr" class="hidden flex-1 bg-green-500 text-white p-3 rounded-xl font-bold uppercase text-xs">Tomar Foto</button>
+                                <button type="button" onclick="detenerCamara('qr')" id="btn-stop-qr" class="hidden bg-red-600 text-white p-3 px-5 rounded-xl font-bold">X</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="abrirTotemQR()" id="btn-submit-qr" disabled class="w-full py-5 bg-slate-700 text-slate-400 rounded-2xl font-black text-lg shadow-xl uppercase transition-colors cursor-not-allowed">Toma Foto para Ingresar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Canvas oculto general para procesar imágenes -->
+    <canvas id="hidden-canvas" class="hidden"></canvas>
+
+    <!-- MODAL INFORMACIÓN -->
+    <div id="modalInfo" class="modal-overlay">
+        <div class="modal-content border-t-4 border-green-500">
+            <div class="flex justify-between items-center mb-8">
+                <h3 class="text-2xl font-black text-green-400 tracking-tighter uppercase italic">Información Maipú</h3>
+                <button onclick="closeModal('modalInfo')" class="text-gray-500">✕</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-[#0d121f] p-8 rounded-[2.5rem] border border-slate-800">
+                    <h4 id="infoTitle" class="text-xl font-black text-green-400 uppercase mb-3 tracking-tighter italic">...</h4>
+                    <p id="infoText" class="text-xs text-slate-400 leading-relaxed font-bold italic"></p>
+                </div>
+                <div class="bg-[#0d121f] p-8 rounded-[2.5rem] border border-slate-800 text-center flex flex-col items-center justify-center">
+                    <p class="text-[9px] font-black text-slate-500 uppercase mb-4 tracking-widest">Redes Municipales</p>
+                    <div id="socialQR" class="bg-white p-2 rounded-xl mb-4"></div>
+                    <p class="text-[10px] font-bold text-green-400 uppercase">Sigue a @Muni_Maipu</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL SEGURIDAD -->
+    <div id="modalSeguridad" class="modal-overlay">
+        <div class="modal-content border-t-8 border-red-500 text-center">
+            <h3 class="text-5xl font-black text-red-500 mb-4 tracking-tighter italic">¿ENVIAR ALERTA?</h3>
+            <p class="mb-8 text-slate-300 text-lg font-bold uppercase tracking-widest italic">Se despachará patrulla preventiva al punto <b id="pointID">MP-P-01</b>.</p>
+            <div class="flex gap-4">
+                <button onclick="closeModal('modalSeguridad')" class="flex-1 py-5 bg-gray-700 rounded-2xl font-bold uppercase tracking-widest">CANCELAR</button>
+                <button onclick="triggerGlobalIncident('CRÍTICO', 'Alerta de Seguridad Activada')" class="flex-1 py-5 bg-red-600 rounded-2xl font-black uppercase tracking-widest shadow-xl">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="fixed bottom-6 right-6 bg-white text-slate-900 px-8 py-4 rounded-xl shadow-2xl transform translate-y-32 opacity-0 transition-all duration-500 z-[1000] font-black text-[10px] uppercase tracking-widest text-center border-l-8 border-blue-600"></div>
+
+    <script>
+        const API_BASE_URL = "http://127.0.0.1:5000"; // Conexión a la central local
+
+        const facts = [
+            { t: "Cuna de la Libertad", p: "El 5 de abril de 1818 se selló la independencia en la Batalla de Maipú." },
+            { t: "Agua 100% Municipal", p: "SMAPA es la única sanitaria municipal del país, brindando agua pura local." },
+            { t: "El Templo Votivo", p: "Mide 90 metros de altura y es el corazón espiritual de nuestra comuna histórica." },
+            { t: "Abrazo Histórico", p: "Aquí se fundieron O'Higgins y San Martín para sellar el destino de Chile." }
+        ];
+
+        const subs = {
+            Ropa: ["Parkas e Invierno", "Vestuario Verano", "Pantalones y Jeans", "Calzado Adulto/Niño", "Ropa de Cama"],
+            Alimentos: ["Legumbres y Arroz", "Enlatados/Conservas", "Tallarines y Pastas", "Leche y Lácteos", "Aceite y Abarrotes"],
+            Aseo: ["Jabón e Higiene Personal", "Detergente Ropa", "Papel Higiénico", "Artículos de Limpieza"],
+            Otros: ["Juguetes y Peluches", "Libros y Cuentos", "Útiles Escolares", "Primeros Auxilios"]
+        };
+
+        // VARIABLES DE CÁMARA
+        let currentVideoStream = null;
+        let activeBase64Image = null;
+        let currentContext = null; // 'manual' o 'qr'
+        let currentTicketData = null; // Guarda temporalmente los datos del QR válido
+
+        function updateTotemID() {
+            const select = document.getElementById('totemLocation');
+            const val = select.value;
+            const fullText = select.options[select.selectedIndex].text;
+            
+            document.getElementById('totemIDDisplay').innerText = "MP-" + val;
+            document.getElementById('pointID').innerText = "MP-" + val;
+            
+            // Guardar en sessionStorage para saber en qué tótem estamos en la vida real
+            // CORRECCIÓN: Limpiar el string de cualquier cosa extra antes de guardar el nombre real del tótem
+            sessionStorage.setItem('current_totem_location', fullText.replace('📍', '').trim()); 
+            
+            flash("📍 Ubicación de Terminal Configurada.");
+        }
+        
+        // Inicializar tótem default
+        updateTotemID();
+
+        function updateClock() {
+            document.getElementById('clock').innerText = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+        }
+        setInterval(updateClock, 1000); updateClock();
+
+        function openModal(id) {
+            document.getElementById(id).style.display = 'flex';
+            if(id === 'modalInfo') {
+                const f = facts[Math.floor(Math.random()*facts.length)];
+                document.getElementById('infoTitle').innerText = f.t;
+                document.getElementById('infoText').innerText = f.p;
+                const sqr = document.getElementById('socialQR');
+                sqr.innerHTML = "";
+                new QRCode(sqr, { text: "https://www.instagram.com/muni_maipu", width: 120, height: 120 });
+            }
+        }
+        
+        function closeModal(id) { 
+            document.getElementById(id).style.display = 'none'; 
+            detenerCamara(); // Apaga la cámara si cerró el modal de golpe
+            backToHub(); 
+        }
+
+        function showSubForm(id) {
+            ['hubSelection', 'donarMethodSelection', 'formManual', 'formScanner', 'formSalud', 'formApoyo'].forEach(sub => {
+                const el = document.getElementById(sub); if(el) el.classList.add('hidden');
+            });
+            document.getElementById(id).classList.remove('hidden');
+            
+            // Si regresa al scanner principal, limpiar inputs previos
+            if(id === 'formScanner') {
+                document.getElementById('scanner-input-group').classList.remove('hidden');
+                document.getElementById('scanResult').classList.add('hidden');
+                document.getElementById('scanInput').value = "";
+                currentTicketData = null;
+            }
+        }
+        function backToHub() { showSubForm('hubSelection'); }
+
+        function updateSub() {
+            const cat = document.getElementById('m-cat').value;
+            const sub = document.getElementById('m-sub');
+            sub.innerHTML = subs[cat] ? subs[cat].map(x => `<option value="${x}">${x}</option>`).join('') : '<option value="">Seleccione Sub-tipo...</option>';
+        }
+
+        // --- SISTEMA DE CÁMARA TERMINAL --- //
+        async function iniciarCamara(context) {
+            currentContext = context; // 'manual' o 'qr'
+            const videoEl = document.getElementById(`video-${context}`);
+            const previewEl = document.getElementById(`preview-${context}`);
+            
+            try {
+                currentVideoStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } 
+                });
+                videoEl.srcObject = currentVideoStream;
+                
+                videoEl.classList.remove('hidden');
+                previewEl.classList.add('hidden');
+                activeBase64Image = null; // Resetea si vuelve a abrir
+                
+                document.getElementById(`btn-start-cam-${context}`).classList.add('hidden');
+                document.getElementById(`btn-snap-${context}`).classList.remove('hidden');
+                document.getElementById(`btn-stop-${context}`).classList.remove('hidden');
+                
+                deshabilitarBotonEnvio(context);
+                
+            } catch (err) {
+                flash('❌ Permiso de cámara denegado o dispositivo sin cámara.');
+            }
+        }
+
+        function tomarFoto(context) {
+            if (!currentVideoStream) return;
+            const videoEl = document.getElementById(`video-${context}`);
+            const canvasEl = document.getElementById('hidden-canvas');
+            const previewEl = document.getElementById(`preview-${context}`);
+            
+            canvasEl.width = videoEl.videoWidth;
+            canvasEl.height = videoEl.videoHeight;
+            const ctx = canvasEl.getContext('2d');
+            ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+            
+            activeBase64Image = canvasEl.toDataURL('image/jpeg', 0.7);
+            
+            // Detener el stream para ahorrar batería
+            currentVideoStream.getTracks().forEach(track => track.stop());
+            currentVideoStream = null;
+            
+            // Cambiar UI
+            videoEl.classList.add('hidden');
+            previewEl.src = activeBase64Image;
+            previewEl.classList.remove('hidden');
+            
+            document.getElementById(`btn-snap-${context}`).classList.add('hidden');
+            document.getElementById(`btn-stop-${context}`).classList.add('hidden');
+            document.getElementById(`btn-start-cam-${context}`).innerText = "Retomar Foto";
+            document.getElementById(`btn-start-cam-${context}`).classList.remove('hidden');
+            
+            habilitarBotonEnvio(context);
+            flash('📸 Captura física exitosa');
+        }
+
+        function detenerCamara(context = currentContext) {
+            if(!context) return;
+            if (currentVideoStream) {
+                currentVideoStream.getTracks().forEach(track => track.stop());
+                currentVideoStream = null;
+            }
+            document.getElementById(`video-${context}`).classList.add('hidden');
+            
+            if(!activeBase64Image) {
+                document.getElementById(`btn-start-cam-${context}`).innerText = "Activar Cámara";
+                document.getElementById(`btn-start-cam-${context}`).classList.remove('hidden');
+                document.getElementById(`btn-snap-${context}`).classList.add('hidden');
+                document.getElementById(`btn-stop-${context}`).classList.add('hidden');
+            }
+        }
+
+        function habilitarBotonEnvio(context) {
+            const btn = document.getElementById(`btn-submit-${context}`);
+            btn.disabled = false;
+            btn.className = "w-full py-5 bg-green-600 text-white rounded-2xl font-black text-lg uppercase shadow-xl shadow-green-900/40 transition-colors";
+            btn.innerText = "ABRIR TÓTEM E INGRESAR";
+        }
+
+        function deshabilitarBotonEnvio(context) {
+            const btn = document.getElementById(`btn-submit-${context}`);
+            btn.disabled = true;
+            btn.className = "w-full py-5 bg-slate-700 text-slate-400 rounded-2xl font-black text-lg uppercase shadow-xl transition-colors cursor-not-allowed";
+            btn.innerText = "CAPTURA FOTO PARA CONTINUAR";
+        }
+
+        // --- COMUNICACIÓN CON CENTRAL (Usando Flask) --- //
+        async function fetchAPI(endpoint, options = {}) {
+            try {
+                const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+                    headers: { 'Content-Type': 'application/json' }, ...options
+                });
+                return await res.json();
+            } catch (err) { return null; }
+        }
+
+        async function triggerGlobalIncident(prio, msg) {
+            const loc = sessionStorage.getItem('current_totem_location');
+            const res = await fetchAPI('/api/alerts/create', { 
+                method: 'POST', 
+                body: JSON.stringify({ prioridad: prio, mensaje: msg, ubicacion: loc, user: 'Terminal Público' }) 
+            });
+            if(res && res.status === 'success') {
+                flash("🚨 ALERTA SINCRONIZADA CON CENTRAL");
+            } else {
+                flash("❌ Error de red al alertar");
+            }
+            closeModal(document.querySelector('.modal-overlay:not(.hidden)')?.id);
+        }
+
+        async function registrarDonacionManual(e) {
+            e.preventDefault();
+            if(!activeBase64Image) return flash("⚠️ Foto obligatoria en terminal.");
+            
+            const currentTotemName = sessionStorage.getItem('current_totem_location');
+            
+            // Hacemos match manual para sacar el ID basado en el nombre de la BD
+            let totem_id = 1; // Default fallback
+            if(currentTotemName.includes("Santiago Bueras")) totem_id = 2;
+            else if(currentTotemName.includes("Mall Arauco")) totem_id = 3;
+            else if(currentTotemName.includes("Intermodal")) totem_id = 4;
+
+            const payload = {
+                totem_id: totem_id,
+                categoria: document.getElementById('m-cat').value,
+                subcategoria: document.getElementById('m-sub').value,
+                descripcion: document.getElementById('m-desc').value,
+                estado_conservacion: document.querySelector('input[name="m-est"]:checked').value,
+                tipo_empaque: document.querySelector('input[name="m-emp"]:checked').value,
+                fecha_vencimiento: document.getElementById('m-venc').value || 'No perecible',
+                user: "Ingreso Manual Tótem",
+                imagen_base64: activeBase64Image
+            };
+
+            const btn = document.getElementById('btn-submit-manual');
+            btn.innerText = "Enviando..."; btn.disabled = true;
+
+            const res = await fetchAPI('/api/donations/create', { method: 'POST', body: JSON.stringify(payload) });
+            
+            if (res && res.status === 'success') {
+                flash("🔓 TÓTEM ABIERTO. REGISTRO EXITOSO.");
+                activeBase64Image = null; // Limpiar
+                e.target.reset(); // Limpiar form
+                closeModal('modalSocialHub');
+            } else {
+                flash("❌ Error al procesar donación");
+                habilitarBotonEnvio('manual');
+            }
+        }
+
+        // --- FLUJO DE QR VINCULADO --- //
+        async function buscarTicket() {
+            const code = document.getElementById('scanInput').value.trim().toUpperCase();
+            if(!code) return flash("⚠️ Ingrese Código");
+            
+            const ticket = JSON.parse(localStorage.getItem('maipu_active_ticket'));
+            
+            if(!ticket || ticket.id !== code) {
+                return flash("❌ TICKET NO VÁLIDO O INEXISTENTE");
+            }
+            if(ticket.status === 'usado') {
+                return flash("❌ ESTE TICKET YA FUE UTILIZADO");
+            }
+
+            // 1. VALIDACIÓN ESTRICTA DEL TÓTEM DE ENTREGA (CON LIMPIEZA)
+            let currentTotemName = sessionStorage.getItem('current_totem_location') || "";
+            let ticketTotemName = ticket.totem || "";
+            
+            // CORRECCIÓN: Limpiar caracteres, emojis y espacios para una comparación segura
+            currentTotemName = currentTotemName.replace(/📍/g, '').trim();
+            ticketTotemName = ticketTotemName.replace(/📍/g, '').trim();
+
+            if(ticketTotemName !== currentTotemName) {
+                return flash(`🚫 ERROR: Este ticket fue declarado para entrega en ${ticketTotemName}. Usted está en ${currentTotemName}.`);
+            }
+
+            // Si es válido, pasamos a la siguiente fase
+            currentTicketData = ticket;
+            
+            document.getElementById('scanner-input-group').classList.add('hidden');
+            
+            document.getElementById('itemList').innerHTML = `
+                <div class="text-[11px] space-y-3">
+                    <p class="text-slate-500 uppercase font-black">Vecino/a: <span class="text-white ml-2 uppercase">${ticket.user}</span></p>
+                    <p class="text-slate-500 uppercase font-black">Tótem Destino: <span class="text-green-400 ml-2 uppercase">📍 ${ticket.totem} (CORRECTO)</span></p>
+                    <p class="text-slate-500 uppercase font-black">Detalle: <span class="text-blue-400 ml-2 uppercase">${ticket.cat} (${ticket.sub})</span></p>
+                    <div class="mt-4 p-5 bg-slate-900 rounded-2xl border border-slate-800 text-slate-300 italic">"${ticket.desc}"</div>
+                </div>`;
+            document.getElementById('scanResult').classList.remove('hidden');
+            flash("✅ DATOS CARGADOS. VERIFICACIÓN EN PUNTO.");
+        }
+
+        async function abrirTotemQR() { 
+            if(!activeBase64Image) return flash("⚠️ Captura foto obligatoria");
+            
+            // En un sistema real, actualizaríamos la imagen del ticket existente en MySQL.
+            // Para la maqueta, marcaremos el ticket como usado y mandaremos el suceso a la central.
+            currentTicketData.status = 'usado';
+            localStorage.setItem('maipu_active_ticket', JSON.stringify(currentTicketData));
+            
+            // Avisar a la bitácora vía Flask
+            await fetchAPI('/api/alerts/create', { 
+                method: 'POST', 
+                body: JSON.stringify({ prioridad: 'PREVENTIVO', mensaje: `Ticket ${currentTicketData.id} validado e ingresado en físico en ${currentTicketData.totem}.`, ubicacion: currentTicketData.totem, user: 'Tótem Automático' }) 
+            });
+
+            flash("🔓 TÓTEM ABIERTO. Insumo ingresado exitosamente.");
+            activeBase64Image = null;
+            currentTicketData = null;
+            closeModal('modalSocialHub'); 
+        }
+
+        function formatRUT(input) { let v = input.value.replace(/\./g, '').replace('-', ''); if (v.length > 1) { input.value = v.slice(0, -1) + '-' + v.slice(-1).toUpperCase(); } }
+        function flash(m) { const t = document.getElementById('toast'); t.innerText = m; t.classList.remove('translate-y-32', 'opacity-0'); setTimeout(() => t.classList.add('translate-y-32', 'opacity-0'), 3500); }
+    </script>
+</body>
+</html>
